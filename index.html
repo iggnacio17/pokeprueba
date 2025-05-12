@@ -3,229 +3,204 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>App de Examen</title>
+  <title>App de Exámenes</title>
   <style>
-    * {
-      box-sizing: border-box;
-      font-family: 'Segoe UI', sans-serif;
-    }
     body {
-      margin: 0;
-      background: #f1f3f6;
+      font-family: 'Segoe UI', sans-serif;
+      background: #f2f2f2;
       color: #333;
+      margin: 0;
+      padding: 0;
     }
     header {
-      background: #4f46e5;
+      background: #007BFF;
       color: white;
       padding: 1rem;
       text-align: center;
-      font-size: 1.5rem;
     }
     .container {
       padding: 1rem;
+      max-width: 800px;
+      margin: auto;
     }
-    .question-form, .exam-section {
+    .question {
       background: white;
       padding: 1rem;
-      border-radius: 1rem;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-      margin-bottom: 2rem;
+      margin-bottom: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
-    input, select, textarea, button {
-      width: 100%;
-      padding: 0.5rem;
-      margin: 0.5rem 0;
-      border-radius: 0.5rem;
-      border: 1px solid #ccc;
-    }
-    button {
-      background: #4f46e5;
-      color: white;
-      cursor: pointer;
-      transition: 0.2s;
-    }
-    button:hover {
-      background: #3730a3;
-    }
-    .option-list {
+    .question img {
+      max-width: 100%;
       margin-top: 0.5rem;
     }
-    .option-list input {
-      width: calc(100% - 2rem);
-      display: inline-block;
+    button, input[type="file"] {
+      background: #007BFF;
+      color: white;
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 5px;
+      margin: 0.5rem 0;
+      cursor: pointer;
+      transition: background 0.3s;
     }
-    .option-list button {
-      width: 1.5rem;
-      height: 1.5rem;
-      margin-left: 0.5rem;
-      background: red;
+    button:hover {
+      background: #0056b3;
     }
-    .feedback {
-      margin-top: 1rem;
+    .exam-result {
       padding: 1rem;
-      border-radius: 0.5rem;
-      background: #d1fae5;
-      color: #065f46;
+      background: #fff;
+      border-radius: 8px;
+      margin-top: 1rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
-    .exam-timer {
-      font-weight: bold;
-      color: #b91c1c;
+    .correct {
+      color: green;
+    }
+    .incorrect {
+      color: red;
     }
   </style>
 </head>
 <body>
-  <header>App de Examen</header>
+  <header>
+    <h1>App de Exámenes</h1>
+  </header>
   <div class="container">
-    <section class="question-form">
-      <h2>Crear Pregunta</h2>
-      <input type="text" id="question-text" placeholder="Pregunta" />
-      <input type="text" id="image-url" placeholder="URL de imagen (opcional)" />
-      <div id="options" class="option-list"></div>
-      <button onclick="addOption()">Añadir Opción</button>
-      <select id="correct-option"></select>
-      <button onclick="saveQuestion()">Guardar Pregunta</button>
-      <div id="save-feedback" class="feedback" style="display:none;">Pregunta guardada correctamente.</div>
-    </section>
-
-    <section>
-      <button onclick="exportQuestions()">Exportar JSON</button>
-      <input type="file" id="import-file" accept="application/json" onchange="importQuestions(event)" />
-    </section>
-
-    <section class="exam-section">
-      <h2>Modo Examen</h2>
-      <button onclick="startExam()">Comenzar Examen</button>
-      <div id="exam-container" style="display:none;"></div>
-      <div id="exam-results" class="feedback" style="display:none;"></div>
-    </section>
+    <input type="file" id="importFile" accept="application/json" />
+    <button onclick="exportQuestions()">Exportar Preguntas</button>
+    <button onclick="startExam()">Modo Examen</button>
+    <div id="questionForm">
+      <h2>Nueva Pregunta</h2>
+      <input type="text" id="newQuestion" placeholder="Pregunta" />
+      <input type="text" id="optionA" placeholder="Opción A" />
+      <input type="text" id="optionB" placeholder="Opción B" />
+      <input type="text" id="optionC" placeholder="Opción C" />
+      <input type="text" id="optionD" placeholder="Opción D" />
+      <input type="text" id="correctAnswer" placeholder="Respuesta correcta (A/B/C/D)" />
+      <input type="text" id="imageUrl" placeholder="URL de imagen (opcional)" />
+      <button onclick="addQuestion()">Guardar Pregunta</button>
+    </div>
+    <div id="examSection" style="display:none"></div>
+    <div id="resultSection"></div>
   </div>
 
   <script>
     let questions = JSON.parse(localStorage.getItem("questions") || "[]");
-    let currentOptions = [];
 
-    function addOption() {
-      const optionText = prompt("Texto de la opción:");
-      if (optionText) {
-        currentOptions.push(optionText);
-        updateOptionsUI();
-      }
+    function saveQuestions() {
+      localStorage.setItem("questions", JSON.stringify(questions));
     }
 
-    function removeOption(index) {
-      currentOptions.splice(index, 1);
-      updateOptionsUI();
-    }
-
-    function updateOptionsUI() {
-      const optionsDiv = document.getElementById("options");
-      const correctSelect = document.getElementById("correct-option");
-      optionsDiv.innerHTML = "";
-      correctSelect.innerHTML = "";
-      currentOptions.forEach((opt, i) => {
-        optionsDiv.innerHTML += `<div><input value="${opt}" disabled /> <button onclick="removeOption(${i})">x</button></div>`;
-        correctSelect.innerHTML += `<option value="${i}">${opt}</option>`;
-      });
-    }
-
-    function saveQuestion() {
-      const questionText = document.getElementById("question-text").value;
-      const image = document.getElementById("image-url").value;
-      const correct = parseInt(document.getElementById("correct-option").value);
-      if (!questionText || currentOptions.length < 2 || isNaN(correct)) {
-        alert("Faltan datos o hay muy pocas opciones");
+    function addQuestion() {
+      const q = document.getElementById("newQuestion").value.trim();
+      const a = document.getElementById("optionA").value.trim();
+      const b = document.getElementById("optionB").value.trim();
+      const c = document.getElementById("optionC").value.trim();
+      const d = document.getElementById("optionD").value.trim();
+      const correct = document.getElementById("correctAnswer").value.trim().toUpperCase();
+      const image = document.getElementById("imageUrl").value.trim();
+      if (!q || !a || !b || !c || !d || !["A","B","C","D"].includes(correct)) {
+        alert("Por favor completa todos los campos correctamente");
         return;
       }
-      questions.push({ pregunta: questionText, opciones: currentOptions.slice(), correcta: correct, imagen: image || null });
-      localStorage.setItem("questions", JSON.stringify(questions));
-      document.getElementById("save-feedback").style.display = "block";
-      setTimeout(() => document.getElementById("save-feedback").style.display = "none", 2000);
-      document.getElementById("question-text").value = "";
-      document.getElementById("image-url").value = "";
-      currentOptions = [];
-      updateOptionsUI();
+      questions.push({
+        question: q,
+        options: { A: a, B: b, C: c, D: d },
+        correct: correct,
+        image: image || null
+      });
+      saveQuestions();
+      alert("Pregunta guardada ✅");
     }
 
-    function exportQuestions() {
-      const blob = new Blob([JSON.stringify(questions, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "preguntas.json";
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-
-    function importQuestions(event) {
+    document.getElementById("importFile").addEventListener("change", function(e) {
+      const file = e.target.files[0];
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.onload = function(event) {
         try {
-          questions = JSON.parse(reader.result);
-          localStorage.setItem("questions", JSON.stringify(questions));
-          alert("Preguntas importadas correctamente");
-        } catch {
-          alert("Archivo inválido");
+          const newQuestions = JSON.parse(event.target.result);
+          if (Array.isArray(newQuestions)) {
+            questions = questions.concat(newQuestions);
+            saveQuestions();
+            alert("Preguntas importadas y acumuladas ✅");
+          } else {
+            alert("El archivo no contiene un array de preguntas válido");
+          }
+        } catch (e) {
+          alert("Error al importar JSON");
         }
       };
-      reader.readAsText(event.target.files[0]);
+      reader.readAsText(file);
+    });
+
+    function exportQuestions() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(questions));
+      const dl = document.createElement("a");
+      dl.setAttribute("href", dataStr);
+      dl.setAttribute("download", "preguntas.json");
+      dl.click();
     }
 
-    let timer;
     function startExam() {
-      const examContainer = document.getElementById("exam-container");
-      const results = document.getElementById("exam-results");
-      if (questions.length < 30) return alert("Se requieren al menos 30 preguntas");
-      const examQuestions = [...questions].sort(() => 0.5 - Math.random()).slice(0, 30);
-      let answers = [];
-      let startTime = Date.now();
-      let duration = 45 * 60 * 1000; // 45 mins
-      let index = 0;
-      results.style.display = "none";
-
-      function renderQuestion() {
-        const q = examQuestions[index];
-        let html = `<p><strong>Pregunta ${index + 1}/30:</strong> ${q.pregunta}</p>`;
-        if (q.imagen) html += `<img src="${q.imagen}" style="max-width:100%;border-radius:8px;" />`;
-        q.opciones.forEach((opt, i) => {
-          html += `<label><input type="radio" name="q${index}" value="${i}" /> ${opt}</label><br />`;
-        });
-        html += `<br><button onclick="nextQuestion()">Siguiente</button>`;
-        html += `<p class="exam-timer" id="timer"></p>`;
-        examContainer.innerHTML = html;
-        examContainer.style.display = "block";
+      if (questions.length < 30) {
+        alert("Debes tener al menos 30 preguntas para iniciar el examen");
+        return;
       }
+      document.getElementById("questionForm").style.display = "none";
+      document.getElementById("examSection").style.display = "block";
 
-      window.nextQuestion = function () {
-        const selected = document.querySelector(`input[name=q${index}]:checked`);
-        answers.push(selected ? parseInt(selected.value) : -1);
-        index++;
-        if (index < 30) renderQuestion();
-        else finishExam();
-      }
+      const selected = questions.sort(() => 0.5 - Math.random()).slice(0, 30);
+      const examContainer = document.getElementById("examSection");
+      examContainer.innerHTML = '<h2>Examen</h2><div id="timer"></div>';
+      selected.forEach((q, index) => {
+        const div = document.createElement("div");
+        div.className = "question";
+        div.innerHTML = `
+          <p><b>${index + 1}. ${q.question}</b></p>
+          ${q.image ? `<img src="${q.image}" />` : ""}
+          <label><input type="radio" name="q${index}" value="A"> A. ${q.options.A}</label><br>
+          <label><input type="radio" name="q${index}" value="B"> B. ${q.options.B}</label><br>
+          <label><input type="radio" name="q${index}" value="C"> C. ${q.options.C}</label><br>
+          <label><input type="radio" name="q${index}" value="D"> D. ${q.options.D}</label><br>
+        `;
+        examContainer.appendChild(div);
+      });
+      const submitBtn = document.createElement("button");
+      submitBtn.textContent = "Finalizar Examen";
+      submitBtn.onclick = () => finishExam(selected);
+      examContainer.appendChild(submitBtn);
+      startTimer(45 * 60);
+    }
 
-      function finishExam() {
-        clearInterval(timer);
-        let correctas = 0;
-        examQuestions.forEach((q, i) => {
-          if (q.correcta === answers[i]) correctas++;
-        });
-        const aprobado = correctas >= 21;
-        results.innerHTML = `Resultado: ${correctas}/30<br>${aprobado ? "✅ Aprobado" : "❌ Reprobado"}`;
-        results.style.display = "block";
-        examContainer.style.display = "none";
-      }
-
-      renderQuestion();
-
-      timer = setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        const remaining = duration - elapsed;
-        const min = Math.floor(remaining / 60000);
-        const sec = Math.floor((remaining % 60000) / 1000).toString().padStart(2, '0');
-        const t = document.getElementById("timer");
-        if (t) t.textContent = `Tiempo restante: ${min}:${sec}`;
-        if (remaining <= 0) finishExam();
+    function startTimer(duration) {
+      let timer = duration;
+      const display = document.getElementById("timer");
+      const interval = setInterval(() => {
+        const minutes = String(Math.floor(timer / 60)).padStart(2, '0');
+        const seconds = String(timer % 60).padStart(2, '0');
+        display.textContent = `⏱️ Tiempo restante: ${minutes}:${seconds}`;
+        if (--timer < 0) {
+          clearInterval(interval);
+          alert("Tiempo terminado!");
+          finishExam();
+        }
       }, 1000);
+    }
+
+    function finishExam(selected) {
+      let correct = 0;
+      let html = '<h2>Resultado del Examen</h2>';
+      selected.forEach((q, index) => {
+        const answer = document.querySelector(`input[name="q${index}"]:checked`);
+        const selectedAnswer = answer ? answer.value : null;
+        if (selectedAnswer === q.correct) correct++;
+        html += `<p><b>${index + 1}. ${q.question}</b><br>
+          Tu respuesta: <span class="${selectedAnswer === q.correct ? 'correct' : 'incorrect'}">${selectedAnswer || "Sin responder"}</span><br>
+          Correcta: <span class="correct">${q.correct}</span></p>`;
+      });
+      html += `<h3>${correct >= 21 ? '✅ Aprobado' : '❌ Reprobado'} - ${correct}/30 correctas</h3>`;
+      document.getElementById("resultSection").innerHTML = '<div class="exam-result">' + html + '</div>';
     }
   </script>
 </body>
