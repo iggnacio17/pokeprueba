@@ -1,22 +1,53 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>App de Exámenes Clase B</title>
   <style>
+    :root {
+      --main-bg: #648aaf;
+      --primary: #4b5563;
+      --accent: #10b981;
+      --text: #1f2937;
+      --light: #ffffff;
+      --danger: #ef4444;
+      --border: #002266;
+      --selected: #d1fae5;
+    }
+
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: #f7fafc;
+      background: var(--main-bg);
+      color: var(--text);
       margin: 0;
       padding: 0;
     }
     header {
-      background: #2563eb;
-      color: white;
+      background: var(--primary);
+      color: var(--light);
       padding: 1rem;
       text-align: center;
       font-size: 1.5rem;
+    }
+    nav {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      background: #224ca1;
+      padding: 1rem;
+    }
+    nav button {
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 0.5rem;
+      background: var(--accent);
+      color: rgb(255, 255, 255);
+      font-weight: bold;
+      cursor: pointer;
+    }
+    nav button:hover {
+      background: #059669;
     }
     .container {
       max-width: 900px;
@@ -24,36 +55,32 @@
       padding: 1rem;
     }
     section {
-      background: white;
+      background: var(--light);
       margin-bottom: 1.5rem;
       padding: 1rem;
       border-radius: 0.75rem;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
-    input, select, button {
+    input, select, button.option-btn {
       display: block;
       width: 100%;
       margin: 0.5rem 0;
       padding: 0.5rem;
       border-radius: 0.5rem;
-      border: 1px solid #ccc;
+      border: 1px solid var(--border);
     }
     button {
-      background: #2563eb;
-      color: white;
+      background: var(--accent);
+      color: rgb(0, 0, 0);
       font-weight: bold;
       cursor: pointer;
       transition: background 0.2s;
     }
     button:hover {
-      background: #1e40af;
-    }
-    .feedback {
-      margin-top: 1rem;
-      color: green;
+      background: #059669;
     }
     .question-box {
-      border-bottom: 1px solid #e2e8f0;
+      border-bottom: 1px solid var(--border);
       padding: 1rem 0;
     }
     .correct {
@@ -62,19 +89,44 @@
     .incorrect {
       color: red;
     }
+    .hidden {
+      display: none;
+    }
+    .delete-btn {
+      background: var(--danger);
+      margin-top: 0.5rem;
+    }
+    .option-btn {
+      text-align: left;
+      background: #b9b9b9;
+      border: 1px solid var(--border);
+    }
+    .option-btn.selected {
+      background: var(--selected);
+      border: 2px solid var(--accent);
+    }
+    .info-bar {
+      margin: 1rem 0;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
   <header>App de Exámenes Clase B</header>
-  <div class="container">
-    <section>
-      <h2>Importar / Exportar</h2>
-      <input type="file" id="importFile" accept="application/json" />
-      <button onclick="exportQuestions()">Exportar Preguntas</button>
-    </section>
+  <nav>
+    <button onclick="showSection('editor')">✏️ Editor</button>
+    <button onclick="showSection('examen')">🧪 Examen</button>
+    <button onclick="showSection('banco')">📚 Banco</button>
+  </nav>
 
-    <section>
-      <h2>Nueva Pregunta</h2>
+  <div class="container">
+    <section id="editor">
+      <h2>Editor de Preguntas</h2>
+      <input type="file" id="importFile" accept="application/json">
+      <button onclick="exportQuestions()">Exportar Preguntas</button>
+      <button class="delete-btn" onclick="deleteAllQuestions()">🗑️ Borrar Todas las Preguntas</button>
+
+      <h3>Nueva Pregunta</h3>
       <input type="text" id="newQuestion" placeholder="Escribe la pregunta...">
       <input type="text" id="optionA" placeholder="Opción A">
       <input type="text" id="optionB" placeholder="Opción B">
@@ -85,20 +137,26 @@
       <button onclick="addQuestion()">Guardar Pregunta</button>
     </section>
 
-    <section>
+    <section id="examen" class="hidden">
       <h2>Modo Examen</h2>
+      <div class="info-bar" id="examInfo"></div>
       <button onclick="startExam()">Comenzar Examen</button>
       <div id="examContainer"></div>
     </section>
 
-    <section>
-      <h2>Ver Banco de Preguntas</h2>
+    <section id="banco" class="hidden">
+      <h2>Banco de Preguntas</h2>
       <div id="questionList"></div>
     </section>
   </div>
 
   <script>
     let questions = JSON.parse(localStorage.getItem("questions") || "[]");
+
+    function showSection(id) {
+      document.querySelectorAll("section").forEach(s => s.classList.add("hidden"));
+      document.getElementById(id).classList.remove("hidden");
+    }
 
     function saveQuestions() {
       localStorage.setItem("questions", JSON.stringify(questions));
@@ -122,12 +180,30 @@
       alert("Pregunta guardada ✅");
     }
 
+    function convertOldFormat(item) {
+      if (item.pregunta && Array.isArray(item.opciones) && typeof item.correcta === "number") {
+        const letters = ["A", "B", "C", "D", "E", "F"];
+        const options = {};
+        for (let i = 0; i < item.opciones.length; i++) {
+          options[letters[i]] = item.opciones[i];
+        }
+        return {
+          question: item.pregunta,
+          options: options,
+          correct: letters[item.correcta],
+          image: item.imagen || null
+        };
+      }
+      return item;
+    }
+
     document.getElementById("importFile").addEventListener("change", function(e) {
       const reader = new FileReader();
       reader.onload = function(event) {
         try {
-          const newQuestions = JSON.parse(event.target.result);
+          let newQuestions = JSON.parse(event.target.result);
           if (Array.isArray(newQuestions)) {
+            newQuestions = newQuestions.map(convertOldFormat);
             questions = questions.concat(newQuestions);
             saveQuestions();
             alert("Preguntas importadas correctamente ✅");
@@ -151,40 +227,95 @@
       URL.revokeObjectURL(url);
     }
 
+    function deleteAllQuestions() {
+      if (confirm("¿Estás seguro de que deseas borrar todas las preguntas?")) {
+        questions = [];
+        saveQuestions();
+        alert("Todas las preguntas han sido eliminadas.");
+      }
+    }
+
+    function deleteQuestion(index) {
+      if (confirm("¿Borrar esta pregunta?")) {
+        questions.splice(index, 1);
+        saveQuestions();
+      }
+    }
+
+    let examTimer, timeLeft;
     function startExam() {
       const container = document.getElementById("examContainer");
+      const info = document.getElementById("examInfo");
+      clearInterval(examTimer);
       container.innerHTML = "";
+      info.innerHTML = "";
       if (questions.length < 30) {
-        container.innerHTML = "<p style='color:red;'>Se requieren al menos 30 preguntas para iniciar un examen.</p>";
+        container.innerHTML = "<p style='color: var(--danger);'>Se requieren al menos 30 preguntas para iniciar un examen.</p>";
         return;
       }
-      const selected = questions.sort(() => 0.5 - Math.random()).slice(0, 30);
-      let score = 0;
+      const selected = [...questions].sort(() => 0.5 - Math.random()).slice(0, 30);
+      let answers = new Array(30).fill(null);
+      let start = Date.now();
+      let duration = 45 * 60; // 45 minutos
+      timeLeft = duration;
+
+      function updateInfoBar() {
+        const mins = Math.floor(timeLeft / 60);
+        const secs = String(timeLeft % 60).padStart(2, "0");
+        const answered = answers.filter(a => a !== null).length;
+        info.textContent = `⏱️ Tiempo restante: ${mins}:${secs} | Preguntas respondidas: ${answered}/30`;
+        timeLeft--;
+        if (timeLeft < 0) {
+          clearInterval(examTimer);
+          finishExam();
+        }
+      }
+
+      updateInfoBar();
+      examTimer = setInterval(updateInfoBar, 1000);
+
       selected.forEach((q, i) => {
         const div = document.createElement("div");
         div.className = "question-box";
         div.innerHTML = `<strong>${i + 1}. ${q.question}</strong><br>`;
         if (q.image) div.innerHTML += `<img src="${q.image}" style="max-width:100%;border-radius:0.5rem;margin-top:0.5rem;" /><br>`;
         for (const key in q.options) {
-          div.innerHTML += `<label><input type='radio' name='q${i}' value='${key}' /> ${key}) ${q.options[key]}</label><br>`;
+          const btn = document.createElement("button");
+          btn.className = "option-btn";
+          btn.textContent = `${key}) ${q.options[key]}`;
+          btn.onclick = () => {
+            const all = div.querySelectorAll(".option-btn");
+            all.forEach(b => b.classList.remove("selected"));
+            btn.classList.add("selected");
+            answers[i] = key;
+            updateInfoBar();
+          };
+          div.appendChild(btn);
         }
         container.appendChild(div);
       });
+
       const btn = document.createElement("button");
       btn.textContent = "Finalizar Examen";
-      btn.onclick = () => {
-        selected.forEach((q, i) => {
-          const selectedOption = document.querySelector(`input[name='q${i}']:checked`);
-          if (selectedOption && selectedOption.value === q.correct) {
-            score++;
-          }
-        });
-        const result = document.createElement("p");
-        result.innerHTML = `<strong>Resultado:</strong> ${score}/30<br>${score >= 21 ? "✅ Aprobado" : "❌ Reprobado"}`;
-        container.innerHTML = "";
-        container.appendChild(result);
-      };
+      btn.onclick = finishExam;
       container.appendChild(btn);
+
+      function finishExam() {
+        clearInterval(examTimer);
+        let score = 0;
+        container.innerHTML = "<h3>Resultado del Examen</h3>";
+        selected.forEach((q, i) => {
+          const div = document.createElement("div");
+          div.className = "question-box";
+          div.innerHTML = `<strong>${i + 1}. ${q.question}</strong><br>`;
+          const userAns = answers[i] || "(sin respuesta)";
+          div.innerHTML += `<p><strong>Tu respuesta:</strong> <span class="${userAns === q.correct ? 'correct' : 'incorrect'}">${userAns}</span></p>`;
+          div.innerHTML += `<p><strong>Correcta:</strong> <span class="correct">${q.correct}) ${q.options[q.correct]}</span></p>`;
+          container.appendChild(div);
+          if (userAns === q.correct) score++;
+        });
+        container.innerHTML = `<h3>${score >= 21 ? '✅ Aprobado' : '❌ Reprobado'} — ${score}/30 correctas</h3>` + container.innerHTML;
+      }
     }
 
     function renderQuestionList() {
@@ -203,6 +334,7 @@
           const correctClass = key === q.correct ? "correct" : "";
           div.innerHTML += `<p class='${correctClass}'><strong>${key}:</strong> ${q.options[key]}</p>`;
         }
+        div.innerHTML += `<button class="delete-btn" onclick="deleteQuestion(${i})">🗑️ Borrar esta pregunta</button>`;
         list.appendChild(div);
       });
     }
