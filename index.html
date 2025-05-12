@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>App de Examen</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    body {
+      margin: 0;
+      background: #f1f3f6;
+      color: #333;
+    }
+    header {
+      background: #4f46e5;
+      color: white;
+      padding: 1rem;
+      text-align: center;
+      font-size: 1.5rem;
+    }
+    .container {
+      padding: 1rem;
+    }
+    .question-form, .exam-section {
+      background: white;
+      padding: 1rem;
+      border-radius: 1rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      margin-bottom: 2rem;
+    }
+    input, select, textarea, button {
+      width: 100%;
+      padding: 0.5rem;
+      margin: 0.5rem 0;
+      border-radius: 0.5rem;
+      border: 1px solid #ccc;
+    }
+    button {
+      background: #4f46e5;
+      color: white;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    button:hover {
+      background: #3730a3;
+    }
+    .option-list {
+      margin-top: 0.5rem;
+    }
+    .option-list input {
+      width: calc(100% - 2rem);
+      display: inline-block;
+    }
+    .option-list button {
+      width: 1.5rem;
+      height: 1.5rem;
+      margin-left: 0.5rem;
+      background: red;
+    }
+    .feedback {
+      margin-top: 1rem;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .exam-timer {
+      font-weight: bold;
+      color: #b91c1c;
+    }
+  </style>
+</head>
+<body>
+  <header>App de Examen</header>
+  <div class="container">
+    <section class="question-form">
+      <h2>Crear Pregunta</h2>
+      <input type="text" id="question-text" placeholder="Pregunta" />
+      <input type="text" id="image-url" placeholder="URL de imagen (opcional)" />
+      <div id="options" class="option-list"></div>
+      <button onclick="addOption()">Añadir Opción</button>
+      <select id="correct-option"></select>
+      <button onclick="saveQuestion()">Guardar Pregunta</button>
+      <div id="save-feedback" class="feedback" style="display:none;">Pregunta guardada correctamente.</div>
+    </section>
+
+    <section>
+      <button onclick="exportQuestions()">Exportar JSON</button>
+      <input type="file" id="import-file" accept="application/json" onchange="importQuestions(event)" />
+    </section>
+
+    <section class="exam-section">
+      <h2>Modo Examen</h2>
+      <button onclick="startExam()">Comenzar Examen</button>
+      <div id="exam-container" style="display:none;"></div>
+      <div id="exam-results" class="feedback" style="display:none;"></div>
+    </section>
+  </div>
+
+  <script>
+    let questions = JSON.parse(localStorage.getItem("questions") || "[]");
+    let currentOptions = [];
+
+    function addOption() {
+      const optionText = prompt("Texto de la opción:");
+      if (optionText) {
+        currentOptions.push(optionText);
+        updateOptionsUI();
+      }
+    }
+
+    function removeOption(index) {
+      currentOptions.splice(index, 1);
+      updateOptionsUI();
+    }
+
+    function updateOptionsUI() {
+      const optionsDiv = document.getElementById("options");
+      const correctSelect = document.getElementById("correct-option");
+      optionsDiv.innerHTML = "";
+      correctSelect.innerHTML = "";
+      currentOptions.forEach((opt, i) => {
+        optionsDiv.innerHTML += `<div><input value="${opt}" disabled /> <button onclick="removeOption(${i})">x</button></div>`;
+        correctSelect.innerHTML += `<option value="${i}">${opt}</option>`;
+      });
+    }
+
+    function saveQuestion() {
+      const questionText = document.getElementById("question-text").value;
+      const image = document.getElementById("image-url").value;
+      const correct = parseInt(document.getElementById("correct-option").value);
+      if (!questionText || currentOptions.length < 2 || isNaN(correct)) {
+        alert("Faltan datos o hay muy pocas opciones");
+        return;
+      }
+      questions.push({ pregunta: questionText, opciones: currentOptions.slice(), correcta: correct, imagen: image || null });
+      localStorage.setItem("questions", JSON.stringify(questions));
+      document.getElementById("save-feedback").style.display = "block";
+      setTimeout(() => document.getElementById("save-feedback").style.display = "none", 2000);
+      document.getElementById("question-text").value = "";
+      document.getElementById("image-url").value = "";
+      currentOptions = [];
+      updateOptionsUI();
+    }
+
+    function exportQuestions() {
+      const blob = new Blob([JSON.stringify(questions, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "preguntas.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importQuestions(event) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          questions = JSON.parse(reader.result);
+          localStorage.setItem("questions", JSON.stringify(questions));
+          alert("Preguntas importadas correctamente");
+        } catch {
+          alert("Archivo inválido");
+        }
+      };
+      reader.readAsText(event.target.files[0]);
+    }
+
+    let timer;
+    function startExam() {
+      const examContainer = document.getElementById("exam-container");
+      const results = document.getElementById("exam-results");
+      if (questions.length < 30) return alert("Se requieren al menos 30 preguntas");
+      const examQuestions = [...questions].sort(() => 0.5 - Math.random()).slice(0, 30);
+      let answers = [];
+      let startTime = Date.now();
+      let duration = 45 * 60 * 1000; // 45 mins
+      let index = 0;
+      results.style.display = "none";
+
+      function renderQuestion() {
+        const q = examQuestions[index];
+        let html = `<p><strong>Pregunta ${index + 1}/30:</strong> ${q.pregunta}</p>`;
+        if (q.imagen) html += `<img src="${q.imagen}" style="max-width:100%;border-radius:8px;" />`;
+        q.opciones.forEach((opt, i) => {
+          html += `<label><input type="radio" name="q${index}" value="${i}" /> ${opt}</label><br />`;
+        });
+        html += `<br><button onclick="nextQuestion()">Siguiente</button>`;
+        html += `<p class="exam-timer" id="timer"></p>`;
+        examContainer.innerHTML = html;
+        examContainer.style.display = "block";
+      }
+
+      window.nextQuestion = function () {
+        const selected = document.querySelector(`input[name=q${index}]:checked`);
+        answers.push(selected ? parseInt(selected.value) : -1);
+        index++;
+        if (index < 30) renderQuestion();
+        else finishExam();
+      }
+
+      function finishExam() {
+        clearInterval(timer);
+        let correctas = 0;
+        examQuestions.forEach((q, i) => {
+          if (q.correcta === answers[i]) correctas++;
+        });
+        const aprobado = correctas >= 21;
+        results.innerHTML = `Resultado: ${correctas}/30<br>${aprobado ? "✅ Aprobado" : "❌ Reprobado"}`;
+        results.style.display = "block";
+        examContainer.style.display = "none";
+      }
+
+      renderQuestion();
+
+      timer = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const remaining = duration - elapsed;
+        const min = Math.floor(remaining / 60000);
+        const sec = Math.floor((remaining % 60000) / 1000).toString().padStart(2, '0');
+        const t = document.getElementById("timer");
+        if (t) t.textContent = `Tiempo restante: ${min}:${sec}`;
+        if (remaining <= 0) finishExam();
+      }, 1000);
+    }
+  </script>
+</body>
+</html>
